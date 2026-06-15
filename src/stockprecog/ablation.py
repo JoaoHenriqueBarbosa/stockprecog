@@ -18,6 +18,7 @@ from . import cpcv
 from . import evaluate as E
 from .brapi_ingest import load_for_pipeline
 from .features import TS_FEATURES, make_features
+from .features_fundamental import FUNDAMENTAL_FEATURES, make_fundamental_features
 from .features_micro import MICRO_FEATURES, make_micro_features
 from .features_regime import REGIME_FEATURES, make_regime_features
 from .labeling import make_labels
@@ -36,9 +37,12 @@ def build_feature_matrix(force: bool = False) -> pd.DataFrame:
     feat = make_features(labeled)                      # price TS + ranks já prontos
     micro = make_micro_features(panel)[["date", "ticker"] + MICRO_FEATURES]
     regime = make_regime_features(panel)[["date", "ticker"] + REGIME_FEATURES]
-    df = feat.merge(micro, on=["date", "ticker"]).merge(regime, on=["date", "ticker"])
+    fund = make_fundamental_features(panel)[["date", "ticker"] + FUNDAMENTAL_FEATURES]
+    df = (feat.merge(micro, on=["date", "ticker"])
+          .merge(regime, on=["date", "ticker"])
+          .merge(fund, on=["date", "ticker"]))
     # ranks cross-section (dentro de cada data) das novas features
-    for f in MICRO_FEATURES + REGIME_FEATURES:
+    for f in MICRO_FEATURES + REGIME_FEATURES + FUNDAMENTAL_FEATURES:
         df[f"{f}_rank"] = df.groupby("date")[f].rank(pct=True)
     # sample weights uniqueness
     s = panel_sample_weights(labeled, mode="uniqueness")
@@ -53,6 +57,7 @@ def _featset(name: str) -> list[str]:
     price = TS_FEATURES + [f"{f}_rank" for f in TS_FEATURES]
     micro = MICRO_FEATURES + [f"{f}_rank" for f in MICRO_FEATURES]
     regime = REGIME_FEATURES + [f"{f}_rank" for f in REGIME_FEATURES]
+    fund = FUNDAMENTAL_FEATURES + [f"{f}_rank" for f in FUNDAMENTAL_FEATURES]
     amihud = ["amihud", "amihud_rank"]
     return {
         "price": price,
@@ -62,6 +67,9 @@ def _featset(name: str) -> list[str]:
         "price+regime": price + regime,
         "price+micro+regime": price + micro + regime,
         "micro+regime": micro + regime,
+        "fundamental_only": fund,
+        "price+fundamental": price + fund,
+        "all": price + micro + regime + fund,
     }[name]
 
 
