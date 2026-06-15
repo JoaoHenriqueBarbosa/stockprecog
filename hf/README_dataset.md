@@ -1,7 +1,7 @@
 ---
 license: other
 license_name: mixed-redistribution-restricted
-license_link: LICENSE_NOTICE.md
+license_link: https://github.com/JoaoHenriqueBarbosa/stockprecog/blob/master/hf/LICENSE_NOTICE.md
 language:
   - pt
 pretty_name: stockprecog — B3 cross-sectional reproducible feature panel (code + recipe)
