@@ -1,0 +1,44 @@
+{
+  "title": "stockprecog: An honest-invalidation study of cross-sectional return prediction on the Brazilian equity market (B3)",
+  "description": "<p>A reproducible, rigor-first study of cross-sectional return prediction on 111 liquid Brazilian (B3) equities, built on a Lopez de Prado pipeline (triple-barrier labels, Combinatorial Purged Cross-Validation with trading-day embargo, Deflated and Probabilistic Sharpe Ratios with an honest trials-log, sample-uniqueness weights, fractional differentiation, and square-root market-impact transaction costs).</p><p>This is deliberately a study of <strong>honest invalidation</strong>. Findings: (1) price-derived signals (momentum/volatility/fractional-difference plus microstructure and regime features) are statistically real (gross DSR ~0.41) but economically sub-marginal once one-way transaction costs are charged (net Sharpe -1.1 at ten-day rebalancing); (2) the binding constraint is turnover x cost, not signal strength; (3) a simple linear value/quality fundamental tilt, rebalanced quarterly and pre-registered before estimation, is the only net-positive configuration (net Sharpe +0.18, PSR 0.92, DSR 0.72 over 18 logged trials, ~0.35 annualized) -- both metrics fall below the conventional 0.95 skill threshold, so the result is promising rather than confirmed; (4) state-of-the-art ML does not beat the linear composite: LightGBM LambdaRank overfits (out-of-sample Rank IC -0.014) and TabPFN v2 merely ties the zero-parameter three-factor linear composite. The bottleneck is information and transaction cost, not model capacity.</p><p><strong>Data note:</strong> raw B3 price data is NOT redistributed (B3 prohibits redistribution; brapi.dev terms are silent). This repository follows a code-plus-recipe model: it ships the full pipeline, methodology, and aggregate results, and instructions to reproduce the data with the user's own API key. CVM fundamental data is Brazilian Open Data, redistributable with attribution. See LICENSE and hf/LICENSE_NOTICE.md.</p>",
+  "upload_type": "software",
+  "creators": [
+    {
+      "name": "Barbosa, João Henrique"
+    }
+  ],
+  "keywords": [
+    "quantitative finance",
+    "cross-sectional equity prediction",
+    "Brazilian equities",
+    "B3",
+    "Lopez de Prado",
+    "triple-barrier",
+    "combinatorial purged cross-validation",
+    "deflated Sharpe ratio",
+    "transaction costs",
+    "backtest overfitting",
+    "factor investing",
+    "machine learning",
+    "TabPFN"
+  ],
+  "license": "MIT",
+  "access_right": "open",
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/JoaoHenriqueBarbosa/stockprecog",
+      "relation": "isSupplementTo",
+      "scheme": "url"
+    },
+    {
+      "identifier": "https://huggingface.co/JoaoHenriqueBarbosa/stockprecog",
+      "relation": "isSupplementedBy",
+      "scheme": "url"
+    },
+    {
+      "identifier": "https://huggingface.co/datasets/JoaoHenriqueBarbosa/stockprecog",
+      "relation": "isSupplementedBy",
+      "scheme": "url"
+    }
+  ]
+}
