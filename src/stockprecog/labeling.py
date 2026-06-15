@@ -8,6 +8,7 @@ from . import config as C
 
 
 def daily_vol(close: pd.Series, span: int = C.VOL_SPAN) -> pd.Series:
+    """Volatilidade diária EWM dos log-retornos (escala das barras do triple-barrier)."""
     ret = np.log(close / close.shift(1))
     return ret.ewm(span=span).std()
 
@@ -63,6 +64,7 @@ def _label_ticker(g: pd.DataFrame) -> pd.DataFrame:
 
 
 def make_labels(panel: pd.DataFrame) -> pd.DataFrame:
+    """Aplica triple-barrier por ticker, cacheia em parquet e retorna o painel rotulado."""
     # pandas 3.0: iteração explícita preserva 'ticker' como coluna
     out = pd.concat(
         [_label_ticker(g) for _, g in panel.groupby("ticker", sort=False)],

@@ -81,6 +81,7 @@ def _net_sharpe(test: pd.DataFrame, score: np.ndarray, adv_map: dict,
 
 
 def run(n_groups: int = 6, n_test: int = 2) -> dict:
+    """Learning-to-rank trimestral (LightGBM LambdaRank) sob CPCV: Rank IC, Sharpe net, DSR."""
     q = _quarterly_panel()
     panel = load_for_pipeline()
     adv_map = (panel.assign(dv=panel["close"]*panel["volume"])

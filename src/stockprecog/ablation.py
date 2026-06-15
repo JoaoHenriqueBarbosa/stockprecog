@@ -74,6 +74,7 @@ def _featset(name: str) -> list[str]:
 
 
 def run_ablation(configs: list[str], n_groups: int = 6, n_test: int = 2) -> pd.DataFrame:
+    """Roda CPCV para cada conjunto de features e tabula AUC/Sharpe/DSR/net por config."""
     df = build_feature_matrix()
     adv_map = df.assign(dv=df["close"] * df["volume"]).groupby("ticker")["dv"].median().to_dict()
     cpcv.seed_trials({"L0": 0.0, "L1": -0.022, "L2": 0.028, "L3": -0.088})

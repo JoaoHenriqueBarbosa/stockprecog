@@ -58,6 +58,7 @@ def _eval(q, feats, adv_map, n_groups=6, n_test=2):
 
 
 def run() -> dict:
+    """Ranking trimestral com TabPFN v2 (foundation small-N) vs baseline tilt linear (+0.18)."""
     q = _quarterly_panel()
     panel = load_for_pipeline()
     adv_map = (panel.assign(dv=panel["close"] * panel["volume"])

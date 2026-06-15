@@ -34,6 +34,7 @@ _TPMERC_VISTA = "010"
 
 
 def download_year(year: int, force: bool = False) -> Path:
+    """Baixa o ZIP COTAHIST do ano em RAW_DIR (com retry). Reusa cache se já existe."""
     dest = C.RAW_DIR / f"COTAHIST_A{year}.ZIP"
     if dest.exists() and not force and dest.stat().st_size > 0:
         return dest
@@ -52,6 +53,10 @@ def download_year(year: int, force: bool = False) -> Path:
 
 
 def parse_year(zip_path: Path, tickers: set[str] | None = None) -> pd.DataFrame:
+    """Parseia o layout posicional do COTAHIST (à vista, lote padrão) -> OHLC+volume.
+
+    `tickers` opcional filtra o universo. Preços já divididos por 100 (preço BRUTO).
+    """
     with zipfile.ZipFile(zip_path) as z:
         name = [n for n in z.namelist() if n.upper().endswith(".TXT")][0]
         raw = z.read(name)
@@ -81,6 +86,7 @@ def parse_year(zip_path: Path, tickers: set[str] | None = None) -> pd.DataFrame:
 
 
 def build_panel(years: range, tickers: list[str] | None = None, force: bool = False) -> pd.DataFrame:
+    """Baixa+parseia os anos, concatena e salva o painel COTAHIST em parquet."""
     tset = set(tickers) if tickers else None
     frames = []
     for y in years:

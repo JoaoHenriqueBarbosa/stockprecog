@@ -31,6 +31,7 @@ SCORE_FACTORS = ["earnings_yield", "book_to_price", "profit_margin"]
 
 
 def run() -> dict:
+    """Teste pré-registrado do tilt fundamental value/quality, long-short tercil, rebal trimestral."""
     panel = load_for_pipeline()
     adv_map = (panel.assign(dv=panel["close"] * panel["volume"])
                .groupby("ticker")["dv"].median().to_dict())

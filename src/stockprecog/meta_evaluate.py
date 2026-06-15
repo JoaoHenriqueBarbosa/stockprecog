@@ -45,6 +45,7 @@ def _ls_returns(test: pd.DataFrame, side: np.ndarray, size: np.ndarray) -> np.nd
 
 
 def run(n_groups: int = 6, n_test: int = 2) -> dict:
+    """Compara Sharpe flat vs meta-labeling (cap. 3) sob CPCV — testa se o meta agrega valor."""
     print(">> dados + labeling + features")
     panel = load_for_pipeline()
     feat = make_features(make_labels(panel))

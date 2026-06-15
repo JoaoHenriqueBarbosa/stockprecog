@@ -106,6 +106,7 @@ def _backtest_costed(test: pd.DataFrame, proba: np.ndarray, adv_map: dict,
 
 
 def run(n_groups: int = 6, n_test: int = 2, weight_mode: str | None = "uniqueness") -> dict:
+    """Avaliação CPCV completa do sinal price-derived: AUC, DSR e backtest net de custos."""
     print(">> dados (brapi adjustedClose)")
     panel = load_for_pipeline()
     adv_map = (panel.assign(dv=panel["close"] * panel["volume"])

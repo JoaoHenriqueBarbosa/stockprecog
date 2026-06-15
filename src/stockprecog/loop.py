@@ -30,6 +30,7 @@ def temporal_purged_split(df: pd.DataFrame):
 
 
 def run() -> dict:
+    """Loop end-to-end honesto (split temporal único): ingestão -> labels -> features -> AUC."""
     print(">> ingestão (brapi adjustedClose, 28 ativos)")
     panel = load_for_pipeline()
     print(f"   {len(panel):,} linhas, {panel['ticker'].nunique()} tickers, "

@@ -47,6 +47,7 @@ def _ts_feats(g: pd.DataFrame) -> pd.DataFrame:
 
 
 def make_features(labeled: pd.DataFrame) -> pd.DataFrame:
+    """Gera features TS por ticker + ranks cross-section por data. Point-in-time."""
     df = pd.concat(
         [_ts_feats(g) for _, g in labeled.groupby("ticker", sort=False)],
         ignore_index=True,

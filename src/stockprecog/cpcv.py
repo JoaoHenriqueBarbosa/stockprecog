@@ -83,6 +83,7 @@ def effective_n(test_dates, horizon: int = C.HORIZON) -> int:
 
 
 def n_paths(n_groups: int = 6, n_test: int = 2) -> int:
+    """Nº de paths de backtest gerados pelo CPCV: C(N,k)*k/N."""
     return comb(n_groups, n_test) * n_test // n_groups
 
 
