@@ -3,6 +3,7 @@
 ![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status: research](https://img.shields.io/badge/status-research-orange.svg)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20706701.svg)](https://doi.org/10.5281/zenodo.20706701)
 
 Cross-sectional prediction of **P(trade succeeds)** on Brazilian (B3) equities, built
 on a rigorous [López de Prado / *Advances in Financial Machine Learning*](https://www.wiley.com/en-us/Advances+in+Financial+Machine+Learning-p-9781119482086)
