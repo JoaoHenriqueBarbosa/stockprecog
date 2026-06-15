@@ -113,9 +113,11 @@ def time_decay(weights: pd.Series, last_w: float = 1.0) -> pd.Series:
     return weights.sort_index() * decay
 
 
-def _ticker_weights(g: pd.DataFrame, decay_last_w: float | None) -> pd.Series:
-    """Pesos brutos (atribuição de retorno × decaimento opcional) p/ um ticker.
-    Retorna Series alinhada ao índice original de g (NaN-t1 -> 0)."""
+def _ticker_weights(g: pd.DataFrame, decay_last_w: float | None,
+                    mode: str = "return_attr") -> pd.Series:
+    """Pesos brutos p/ um ticker. mode='return_attr' (4.10, |Σret/conc|, enfatiza
+    movimentos grandes) ou 'uniqueness' (4.2, só corrige sobreposição). Retorna
+    Series alinhada ao índice original de g (NaN-t1 -> 0)."""
     g = g.sort_values("date")
     bars = pd.DatetimeIndex(g["date"])
     t1 = pd.Series(g["t1"].to_numpy(), index=bars)
@@ -128,7 +130,10 @@ def _ticker_weights(g: pd.DataFrame, decay_last_w: float | None) -> pd.Series:
 
     t1v = t1[valid]
     num_co = num_concurrent_events(bars, t1v)
-    w = return_attribution_weights(t1v, num_co, close)  # indexada por t_i (date)
+    if mode == "uniqueness":
+        w = average_uniqueness(t1v, num_co)  # 1/conc média, sem magnitude de retorno
+    else:
+        w = return_attribution_weights(t1v, num_co, close)
     if decay_last_w is not None:
         w = time_decay(w, last_w=decay_last_w)
 
@@ -140,15 +145,17 @@ def _ticker_weights(g: pd.DataFrame, decay_last_w: float | None) -> pd.Series:
 
 
 def panel_sample_weights(labeled_df: pd.DataFrame,
-                         decay_last_w: float | None = None) -> pd.Series:
+                         decay_last_w: float | None = None,
+                         mode: str = "return_attr") -> pd.Series:
     """Orquestra os pesos no painel multi-ticker (AFML cap. 4).
 
     Espera colunas date, ticker, t1, close. Computa por ticker (concorrência só
     dentro da timeline de cada um) e concatena. Labels sem t1 -> peso 0. Retorna
     Series alinhada ao índice de labeled_df, normalizada a média 1 (sobre os > 0).
+    mode: 'return_attr' (4.10) ou 'uniqueness' (4.2).
     """
     parts = [
-        _ticker_weights(g, decay_last_w)
+        _ticker_weights(g, decay_last_w, mode)
         for _, g in labeled_df.groupby("ticker", sort=False)
     ]
     w = pd.concat(parts).reindex(labeled_df.index).fillna(0.0)

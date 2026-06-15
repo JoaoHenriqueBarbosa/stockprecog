@@ -16,8 +16,25 @@ from sklearn.metrics import roc_auc_score
 from . import config as C
 from . import cpcv
 from .brapi_ingest import load_for_pipeline
+from .costs import round_trip_cost_bps
 from .features import FEATURES, make_features
 from .labeling import make_labels
+from .weights import panel_sample_weights
+
+
+def _sample_weights(labeled: pd.DataFrame, mode: str = "return_attr") -> pd.DataFrame:
+    """Pesos de amostra (cap.4), cacheados por modo ('return_attr' ou 'uniqueness')."""
+    cache = C.PROC_DIR / f"sample_weights_{mode}.parquet"
+    if cache.exists():
+        w = pd.read_parquet(cache)
+        if len(w) == len(labeled):
+            return w
+    print(f">> sample weights mode={mode} (cap.4 — pode levar 1-2min)")
+    s = panel_sample_weights(labeled, mode=mode)
+    w = labeled[["ticker", "date"]].copy()
+    w["w"] = s.to_numpy()
+    w.to_parquet(cache, index=False)
+    return w
 
 
 def _model() -> LGBMClassifier:
@@ -29,7 +46,7 @@ def _model() -> LGBMClassifier:
 
 
 def _strategy_returns(test: pd.DataFrame, proba: np.ndarray) -> np.ndarray:
-    """Retorno diário de uma long-short market-neutral por proba cross-section."""
+    """Sensor de sinal: long-short market-neutral diário por proba (sobreposto)."""
     df = test[["date", "fwd_ret"]].copy()
     df["proba"] = proba
     rets = []
@@ -44,9 +61,50 @@ def _strategy_returns(test: pd.DataFrame, proba: np.ndarray) -> np.ndarray:
     return np.asarray(rets, dtype=float)
 
 
-def run(n_groups: int = 6, n_test: int = 2) -> dict:
+def _backtest_costed(test: pd.DataFrame, proba: np.ndarray, adv_map: dict,
+                     capital: float = 2e7, half_spread_bps: float = 10.0,
+                     sigma: float = 0.025, frac: float = 0.5
+                     ) -> tuple[np.ndarray, np.ndarray]:
+    """Backtest econômico NÃO-SOBREPOSTO: rebalanceia a cada HORIZON dias (holding
+    casa com o horizonte do label), long-short equal-weight por proba. frac=fração
+    de cada perna (0.5=split na mediana; 0.1=decis, menos nomes/turnover). Aplica
+    custo lei-sqrt por nome (participation = |Δw|*capital/ADV). Retorna (bruto, líq)."""
+    df = test[["date", "ticker", "fwd_ret"]].copy()
+    df["proba"] = proba
+    days = np.sort(df["date"].unique())[::C.HORIZON]  # stride = HORIZON (não-sobreposto)
+    prev_w: dict = {}
+    gross, net = [], []
+    for d in days:
+        day = df[df["date"] == d]
+        if len(day) < 4:
+            continue
+        hi = day["proba"].quantile(1 - frac); lo_q = day["proba"].quantile(frac)
+        lo = day[day["proba"] >= hi]; sh = day[day["proba"] <= lo_q]
+        if len(lo) == 0 or len(sh) == 0:
+            continue
+        w = {t: 0.5 / len(lo) for t in lo["ticker"]}
+        w.update({t: -0.5 / len(sh) for t in sh["ticker"]})
+        gr = float(sum(w[t] * r for t, r in zip(day["ticker"], day["fwd_ret"])
+                       if t in w and np.isfinite(r)))
+        # custo de rotação vs book anterior
+        cost = 0.0
+        for t in set(w) | set(prev_w):
+            dw = w.get(t, 0.0) - prev_w.get(t, 0.0)
+            if dw == 0:
+                continue
+            adv = adv_map.get(t, np.nan)
+            part = abs(dw) * capital / adv if (np.isfinite(adv) and adv > 0) else 0.01
+            cost += abs(dw) * round_trip_cost_bps(part, sigma, half_spread_bps) / 1e4
+        gross.append(gr); net.append(gr - cost)
+        prev_w = w
+    return np.asarray(gross), np.asarray(net)
+
+
+def run(n_groups: int = 6, n_test: int = 2, weight_mode: str | None = "uniqueness") -> dict:
     print(">> dados (brapi adjustedClose)")
     panel = load_for_pipeline()
+    adv_map = (panel.assign(dv=panel["close"] * panel["volume"])
+               .groupby("ticker")["dv"].median().to_dict())  # ADV em R$ por nome
     print(">> labeling triple-barrier (+t1)")
     labeled = make_labels(panel)
     print(">> features")
@@ -54,6 +112,12 @@ def run(n_groups: int = 6, n_test: int = 2) -> dict:
 
     data = feat.dropna(subset=FEATURES + ["label", "t1"]).copy()
     data["label"] = data["label"].astype(int)
+    if weight_mode:
+        wdf = _sample_weights(labeled, mode=weight_mode)
+        data = data.merge(wdf, on=["ticker", "date"], how="left")
+        data["w"] = data["w"].fillna(0.0)
+    else:
+        data["w"] = 1.0
     data = data.sort_values("date").reset_index(drop=True)
 
     splits = cpcv.cpcv_splits(
@@ -64,6 +128,7 @@ def run(n_groups: int = 6, n_test: int = 2) -> dict:
           f"{cpcv.n_paths(n_groups, n_test)} paths")
 
     aucs, sharpes, all_rets = [], [], []
+    sr_gross_no, sr_net_no = [], []  # backtest não-sobreposto bruto/líquido
     test_dates: set = set()
     for i, (tr, te) in enumerate(splits, 1):
         Xtr, ytr = data.iloc[tr][FEATURES], data.iloc[tr]["label"]
@@ -71,17 +136,24 @@ def run(n_groups: int = 6, n_test: int = 2) -> dict:
         if ytr.nunique() < 2 or yte.nunique() < 2:
             continue
         m = _model()
-        m.fit(Xtr, ytr)
+        m.fit(Xtr, ytr, sample_weight=data.iloc[tr]["w"].to_numpy())
         proba = m.predict_proba(Xte)[:, 1]
         auc = roc_auc_score(yte, proba)
         rets = _strategy_returns(data.iloc[te], proba)
         sr = cpcv.sharpe(rets)
+        gross_no, net_no = _backtest_costed(data.iloc[te], proba, adv_map)
         aucs.append(auc)
         if np.isfinite(sr):
             sharpes.append(sr)
             all_rets.append(rets)
             test_dates.update(data.iloc[te]["date"].to_numpy())
+        sg, sn = cpcv.sharpe(gross_no), cpcv.sharpe(net_no)
+        if np.isfinite(sg):
+            sr_gross_no.append(sg)
+        if np.isfinite(sn):
+            sr_net_no.append(sn)
         print(f"   split {i:2d}/{len(splits)}: AUC={auc:.4f}  Sharpe={sr:.3f}  "
+              f"| não-sobrep bruto={sg:+.3f} líq={sn:+.3f}  "
               f"(treino={len(tr):,} teste={len(te):,})")
 
     aucs = np.array(aucs)
@@ -101,7 +173,9 @@ def run(n_groups: int = 6, n_test: int = 2) -> dict:
     # é uma tentativa de research. A variância ENTRE configs é o insumo do DSR.
     cpcv.seed_trials({"L0_baseline": 0.0, "L1": -0.022, "L2": 0.028, "L3": -0.088})
     if np.isfinite(sr_mean):
-        cpcv.append_trial("R2_embargo_pregao+n_eff", sr_mean)
+        cfg = "L5_universo111+sample_weights" if "w" in data and data["w"].nunique() > 1 \
+            else "L4_universo111"
+        cpcv.append_trial(cfg, sr_mean)
     sr_trials = cpcv.trial_sharpes()
     dsr = cpcv.deflated_sharpe(sr_mean, sr_trials, n_eff, skew=sk, kurt=ku,
                                n_trials=len(sr_trials)) \
@@ -119,6 +193,11 @@ def run(n_groups: int = 6, n_test: int = 2) -> dict:
     print(f"  n_eff={n_eff} (datas únicas={len(test_dates):,}/HORIZON={C.HORIZON}; "
           f"n_pooled bruto={len(pooled):,})  "
           f"trials no log={len(sr_trials)}  skew={sk:.2f} kurt={ku:.2f}")
+    g_no = float(np.mean(sr_gross_no)) if sr_gross_no else np.nan
+    n_no = float(np.mean(sr_net_no)) if sr_net_no else np.nan
+    print(f"\nBacktest NÃO-SOBREPOSTO (rebal/{C.HORIZON}d, custos lei-sqrt @cap R$20M/perna):")
+    print(f"  Sharpe bruto={g_no:+.3f}  ->  LÍQUIDO de custos={n_no:+.3f}  "
+          f"(drag={g_no-n_no:+.3f})")
 
     return {"auc_mean": float(aucs.mean()), "auc_std": float(aucs.std()),
             "sharpe_mean": sr_mean, "n_eff": int(n_eff),
