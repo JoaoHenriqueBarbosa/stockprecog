@@ -21,8 +21,17 @@ UNIVERSE: list[str] = [
     "UGPA3", "ELET3", "EMBR3", "BRFS3", "CPLE6", "NTCO3",
 ]
 
+# Ativos com ajuste NÃO-CONFIÁVEL: ausentes da base histórica da brapi (buraco do
+# lado deles, confirmado por 3 endpoints; não é quota). Só temos fallback
+# COTAHIST+dividendos, que carrega gap de bonificação. NÃO usar no modelo até ter
+# fonte ajustada confiável. Ver reference-b3-data-idiosyncrasies.
+UNRELIABLE: list[str] = ["BRFS3", "CPLE6"]
+
+# Universo efetivamente usável pelo pipeline.
+USABLE_UNIVERSE: list[str] = [t for t in UNIVERSE if t not in UNRELIABLE]
+
 START = "2010-01-01"
-END = "2025-06-01"
+END = "2026-06-15"
 
 # --- triple-barrier labeling ---
 PT_MULT = 2.0       # profit-take em múltiplos de sigma

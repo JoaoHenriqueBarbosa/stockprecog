@@ -11,7 +11,7 @@ from lightgbm import LGBMClassifier
 from sklearn.metrics import accuracy_score, roc_auc_score
 
 from . import config as C
-from .data import ingest
+from .brapi_ingest import load_for_pipeline
 from .features import FEATURES, make_features
 from .labeling import make_labels
 
@@ -30,8 +30,10 @@ def temporal_purged_split(df: pd.DataFrame):
 
 
 def run() -> dict:
-    print(">> ingestão")
-    panel = ingest()
+    print(">> ingestão (brapi adjustedClose, 28 ativos)")
+    panel = load_for_pipeline()
+    print(f"   {len(panel):,} linhas, {panel['ticker'].nunique()} tickers, "
+          f"{panel['date'].min().date()} -> {panel['date'].max().date()}")
     print(">> labeling triple-barrier")
     labeled = make_labels(panel)
     print(">> features")

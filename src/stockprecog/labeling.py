@@ -20,9 +20,11 @@ def _label_ticker(g: pd.DataFrame) -> pd.DataFrame:
     sigma = daily_vol(g["close"]).to_numpy()
     n = len(g)
 
+    dates = g["date"].to_numpy().astype("datetime64[ns]")
     label = np.full(n, np.nan)
     barrier = np.empty(n, dtype=object)
     fwd_ret = np.full(n, np.nan)
+    t1 = np.full(n, np.datetime64("NaT", "ns"))  # data em que o label resolve (p/ purge)
 
     for t in range(n):
         s = sigma[t]
@@ -34,27 +36,29 @@ def _label_ticker(g: pd.DataFrame) -> pd.DataFrame:
         up = close[t] * (1.0 + C.PT_MULT * s)
         dn = close[t] * (1.0 - C.SL_MULT * s)
 
-        lab, why = 0, "vert"
+        lab, why, res = 0, "vert", end
         for k in range(t + 1, end + 1):
             hit_up = high[k] >= up
             hit_dn = low[k] <= dn
             if hit_up and hit_dn:
-                lab, why = 0, "both->sl"
+                lab, why, res = 0, "both->sl", k
                 break
             if hit_up:
-                lab, why = 1, "pt"
+                lab, why, res = 1, "pt", k
                 break
             if hit_dn:
-                lab, why = 0, "sl"
+                lab, why, res = 0, "sl", k
                 break
         label[t] = lab
         barrier[t] = why
         fwd_ret[t] = close[end] / close[t] - 1.0
+        t1[t] = dates[res]
 
     g["sigma"] = sigma
     g["label"] = label
     g["barrier"] = barrier
     g["fwd_ret"] = fwd_ret
+    g["t1"] = t1
     return g
 
 

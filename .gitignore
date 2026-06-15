@@ -8,3 +8,11 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Datasets — regeneráveis via scripts/, não versionar
+data/
+*.parquet
+*.ZIP
+
+# Claude scheduler / local
+.claude/
