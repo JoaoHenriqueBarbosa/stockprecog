@@ -173,13 +173,18 @@ This repo adopts the standard **"code + recipe"** model for reproducible quant f
 
 ## Paper & citation
 
-Paper: *(link — to be added)*.
+**Paper (PDF):** [`paper/paper.pdf`](https://github.com/JoaoHenriqueBarbosa/stockprecog/blob/master/paper/paper.pdf)
+· **DOI:** [10.5281/zenodo.20706701](https://doi.org/10.5281/zenodo.20706701) (concept DOI — always resolves to the latest version)
 
 ```bibtex
-@misc{barbosa_stockprecog,
-  author = {Barbosa, João Henrique},
-  title  = {stockprecog: honest invalidation of cross-sectional equity signals on B3 under a López de Prado ruler},
-  year   = {2026},
-  url    = {https://github.com/JoaoHenriqueBarbosa/stockprecog}
+@software{barbosa_stockprecog_2026,
+  author    = {Barbosa, João Henrique},
+  title     = {stockprecog: An honest-invalidation study of cross-sectional
+               return prediction on the Brazilian equity market (B3)},
+  year      = {2026},
+  publisher = {Zenodo},
+  version   = {v1.0.0},
+  doi       = {10.5281/zenodo.20706701},
+  url       = {https://doi.org/10.5281/zenodo.20706701}
 }
 ```

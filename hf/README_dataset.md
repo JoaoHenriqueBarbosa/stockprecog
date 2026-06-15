@@ -166,12 +166,19 @@ See **[LICENSE_NOTICE.md](LICENSE_NOTICE.md)** for the full per-layer analysis a
 
 ## Citation
 
+**Paper (PDF):** [`paper.pdf`](https://github.com/JoaoHenriqueBarbosa/stockprecog/blob/master/paper/paper.pdf) (also in this repo's files)
+· **DOI:** [10.5281/zenodo.20706701](https://doi.org/10.5281/zenodo.20706701) (concept DOI — latest version)
+
 ```bibtex
-@misc{stockprecog2026,
-  title  = {stockprecog: an honest-invalidation study of cross-sectional
-            tradeability prediction on B3 equities under a López de Prado ruler},
-  author = {Barbosa, João Henrique},
-  year   = {2026},
-  note   = {Pipeline + reproduction recipe; raw market data not redistributed.}
+@software{barbosa_stockprecog_2026,
+  author    = {Barbosa, João Henrique},
+  title     = {stockprecog: An honest-invalidation study of cross-sectional
+               return prediction on the Brazilian equity market (B3)},
+  year      = {2026},
+  publisher = {Zenodo},
+  version   = {v1.0.0},
+  doi       = {10.5281/zenodo.20706701},
+  url       = {https://doi.org/10.5281/zenodo.20706701},
+  note      = {Pipeline + reproduction recipe; raw market data not redistributed.}
 }
 ```
