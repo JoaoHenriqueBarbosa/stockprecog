@@ -51,9 +51,11 @@ def _relevance(fwd: pd.Series) -> np.ndarray:
 
 
 def _net_sharpe(test: pd.DataFrame, score: np.ndarray, adv_map: dict,
-                prev_w: dict) -> tuple[float, dict, list]:
+                prev_w: dict) -> tuple[list, dict, list]:
+    """Retorna (retornos_líquidos, prev_w, turnovers). turnover = Σ|Δw| por rebal —
+    o DIAGNÓSTICO que prediz o líquido antes do custo (price 0.74, fund ~baixo)."""
     t = test[["date", "ticker", "fwd"]].copy(); t["s"] = score
-    rets = []
+    rets, turns = [], []
     for d, day in t.groupby("date", sort=True):
         if len(day) < 12:
             continue
@@ -65,16 +67,17 @@ def _net_sharpe(test: pd.DataFrame, score: np.ndarray, adv_map: dict,
         w.update({tk: -0.5/len(S) for tk in S["ticker"]})
         fwd = dict(zip(day["ticker"], day["fwd"]))
         gr = sum(w[tk]*fwd[tk] for tk in w if np.isfinite(fwd.get(tk, np.nan)))
-        cost = 0.0
+        cost = 0.0; to = 0.0
         for tk in set(w) | set(prev_w):
             dw = w.get(tk, 0.0) - prev_w.get(tk, 0.0)
             if dw == 0:
                 continue
+            to += abs(dw)
             adv = adv_map.get(tk, np.nan)
             part = abs(dw)*CAPITAL/adv if (np.isfinite(adv) and adv > 0) else 0.01
             cost += abs(dw) * (HALF_SPREAD_BPS + impact_bps(part, SIGMA)) / 1e4
-        rets.append(gr - cost); prev_w = w
-    return rets, prev_w
+        rets.append(gr - cost); turns.append(to); prev_w = w
+    return rets, prev_w, turns
 
 
 def run(n_groups: int = 6, n_test: int = 2) -> dict:
@@ -106,7 +109,7 @@ def run(n_groups: int = 6, n_test: int = 2) -> dict:
                 ic, _ = spearmanr(day["sc"], day["fwd"])
                 if np.isfinite(ic):
                     ics.append(ic)
-        rets, _ = _net_sharpe(dte, sc, adv_map, {})
+        rets, _, _ = _net_sharpe(dte, sc, adv_map, {})
         net_all.extend(rets)
 
     ic = float(np.mean(ics)) if ics else np.nan
