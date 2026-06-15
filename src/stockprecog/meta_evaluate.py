@@ -62,7 +62,7 @@ def run(n_groups: int = 6, n_test: int = 2) -> dict:
         te_df = data.iloc[te]
         # split interno temporal no treino (1ª metade primário, 2ª meta)
         cut = tr_df["date"].quantile(0.5)
-        p_df = tr_df[tr_df["date"] <= cut]
+        p_df = tr_df[(tr_df["date"] <= cut) & (tr_df["t1"] <= cut)]
         m_df = tr_df[tr_df["date"] > cut]
         if p_df["label"].nunique() < 2 or len(m_df) < 200:
             continue

@@ -4,11 +4,13 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from . import config as C
 from .fracdiff import fracdiff_ffd
 
-# d da fractional differentiation: estacionário p/ todos os ativos do universo,
-# preservando ~93% da memória (vs retorno d=1 que apaga tudo). Ver fracdiff.py.
-FD_D = 0.4
+# parâmetros da fracdiff vivem em config (single source of truth). FD_THRESH=1e-3
+# encurta a janela p/ ~55 barras, evitando o leak feature-memory >> embargo.
+FD_D = C.FD_D
+FD_THRESH = C.FD_THRESH
 
 # features de série temporal por ticker (todas usam só passado)
 TS_FEATURES = ["mom_5", "mom_10", "mom_21", "vol_10", "vol_21", "dist_sma21",
@@ -38,9 +40,9 @@ def _ts_feats(g: pd.DataFrame) -> pd.DataFrame:
     g["dist_sma21"] = c / c.rolling(21).mean() - 1.0
     g["rsi_14"] = _rsi(c, 14)
     # fractional differentiation: nível de preço estacionário c/ memória preservada
-    g["fd_close"] = fracdiff_ffd(np.log(c), FD_D)
+    g["fd_close"] = fracdiff_ffd(np.log(c), FD_D, FD_THRESH)
     # fracdiff da vol (regime de risco com memória, sem ser não-estacionário)
-    g["fd_vol21"] = fracdiff_ffd(g["vol_21"].bfill(), FD_D)
+    g["fd_vol21"] = fracdiff_ffd(g["vol_21"].ffill(), FD_D, FD_THRESH)
     return g
 
 

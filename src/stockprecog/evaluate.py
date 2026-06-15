@@ -64,6 +64,7 @@ def run(n_groups: int = 6, n_test: int = 2) -> dict:
           f"{cpcv.n_paths(n_groups, n_test)} paths")
 
     aucs, sharpes, all_rets = [], [], []
+    test_dates: set = set()
     for i, (tr, te) in enumerate(splits, 1):
         Xtr, ytr = data.iloc[tr][FEATURES], data.iloc[tr]["label"]
         Xte, yte = data.iloc[te][FEATURES], data.iloc[te]["label"]
@@ -79,6 +80,7 @@ def run(n_groups: int = 6, n_test: int = 2) -> dict:
         if np.isfinite(sr):
             sharpes.append(sr)
             all_rets.append(rets)
+            test_dates.update(data.iloc[te]["date"].to_numpy())
         print(f"   split {i:2d}/{len(splits)}: AUC={auc:.4f}  Sharpe={sr:.3f}  "
               f"(treino={len(tr):,} teste={len(te):,})")
 
@@ -88,21 +90,40 @@ def run(n_groups: int = 6, n_test: int = 2) -> dict:
     sk = float(pd.Series(pooled).skew()) if len(pooled) > 2 else 0.0
     ku = float(pd.Series(pooled).kurt() + 3) if len(pooled) > 2 else 3.0
     sr_mean = float(np.mean(sharpes)) if len(sharpes) else np.nan
-    dsr = cpcv.deflated_sharpe(sr_mean, sharpes, len(pooled), skew=sk, kurt=ku) \
-        if len(sharpes) >= 2 else np.nan
+
+    # n EFETIVO: datas de teste únicas / HORIZON. NÃO len(pooled) — pooled duplica
+    # cada data em ~k/N*C(N,k) splits e sobrepõe retornos por HORIZON dias, o que
+    # inflaria sqrt(n-1) maciçamente e mentiria sobre a confiança do PSR/DSR.
+    n_eff = cpcv.effective_n(sorted(test_dates)) if test_dates else 0
+
+    # DSR via LOG DE TRIALS (multiple testing real), não variância dos paths.
+    # Semeia os levers conhecidos L0..L3 e registra o Sharpe DESTA run; cada config
+    # é uma tentativa de research. A variância ENTRE configs é o insumo do DSR.
+    cpcv.seed_trials({"L0_baseline": 0.0, "L1": -0.022, "L2": 0.028, "L3": -0.088})
+    if np.isfinite(sr_mean):
+        cpcv.append_trial("R2_embargo_pregao+n_eff", sr_mean)
+    sr_trials = cpcv.trial_sharpes()
+    dsr = cpcv.deflated_sharpe(sr_mean, sr_trials, n_eff, skew=sk, kurt=ku,
+                               n_trials=len(sr_trials)) \
+        if np.isfinite(sr_mean) and len(sr_trials) >= 2 and n_eff >= 2 else np.nan
 
     print("\n=== AVALIAÇÃO CPCV ===")
     print(f"AUC      : média={aucs.mean():.4f}  desvio={aucs.std():.4f}  "
           f"min={aucs.min():.4f}  max={aucs.max():.4f}")
     print(f"  P(AUC>0.5) empírica: {(aucs > 0.5).mean():.2%}  "
           f"({(aucs > 0.5).sum()}/{len(aucs)} splits)")
-    print(f"Sharpe   : média={sr_mean:.3f}  desvio={sharpes.std():.3f}  "
-          f"(por path, não anualizado)")
+    print(f"Sharpe   : média={sr_mean:.3f}  (por path, não anualizado)")
+    print(f"  dispersão entre paths (estimador, não tentativas): "
+          f"±{sharpes.std():.3f}  ({len(sharpes)} paths)")
     print(f"Deflated Sharpe (P(skill real)) : {dsr:.4f}")
-    print(f"  skew={sk:.2f} kurt={ku:.2f} n_ret={len(pooled):,}")
+    print(f"  n_eff={n_eff} (datas únicas={len(test_dates):,}/HORIZON={C.HORIZON}; "
+          f"n_pooled bruto={len(pooled):,})  "
+          f"trials no log={len(sr_trials)}  skew={sk:.2f} kurt={ku:.2f}")
 
     return {"auc_mean": float(aucs.mean()), "auc_std": float(aucs.std()),
-            "sharpe_mean": sr_mean, "dsr": float(dsr) if np.isfinite(dsr) else None}
+            "sharpe_mean": sr_mean, "n_eff": int(n_eff),
+            "n_trials": int(len(sr_trials)),
+            "dsr": float(dsr) if np.isfinite(dsr) else None}
 
 
 if __name__ == "__main__":

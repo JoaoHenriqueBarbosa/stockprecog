@@ -72,6 +72,46 @@ def build_panel() -> pd.DataFrame:
     return panel
 
 
+API_CACHE = C.RAW_DIR / "brapi_api" / "historical"
+
+
+def _parse_api_file(path: Path) -> pd.DataFrame | None:
+    """Parseia um arquivo de cache do brapi_api (1 result normalizado por ticker)."""
+    r = json.loads(path.read_text())
+    hp = r.get("historicalDataPrice") or []
+    if not hp:
+        return None
+    df = pd.DataFrame(hp)
+    df["date"] = df["date"].map(lambda s: pd.Timestamp(dt.datetime.utcfromtimestamp(s).date()))
+    df["ticker"] = r.get("requestedSymbol", r.get("symbol"))
+    cols = ["date", "ticker", "open", "high", "low", "close", "adjustedClose", "volume"]
+    return df[[c for c in cols if c in df.columns]]
+
+
+def build_panel_api(min_bars: int = 300) -> pd.DataFrame:
+    """Monta painel a partir do cache REST (data/raw/brapi_api/historical/). Inclui
+    todos os tickers com >= min_bars (fracdiff precisa de janela longa). Calcula
+    ADV em R$ (close*volume) por ticker pra seleção de liquidez. Salva parquet."""
+    frames = []
+    for f in sorted(API_CACHE.glob("*.json")):
+        df = _parse_api_file(f)
+        if df is not None and len(df) >= min_bars:
+            frames.append(df)
+    if not frames:
+        raise SystemExit("Nenhum cache em brapi_api/historical/.")
+    panel = (
+        pd.concat(frames, ignore_index=True)
+        .drop_duplicates(subset=["ticker", "date"])
+        .sort_values(["ticker", "date"])
+        .reset_index(drop=True)
+    )
+    out = C.RAW_DIR / "panel_brapi_adj.parquet"
+    panel.to_parquet(out, index=False)
+    print(f"painel API: {len(panel):,} linhas, {panel['ticker'].nunique()} tickers, "
+          f"{panel['date'].min().date()} -> {panel['date'].max().date()}")
+    return panel
+
+
 def load_for_pipeline() -> pd.DataFrame:
     """Painel no schema do pipeline (date,ticker,open,high,low,close,volume) com
     OHLC TOTALMENTE ajustado: close=adjustedClose; OHL escalados pelo fator

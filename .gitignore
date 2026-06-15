@@ -16,3 +16,7 @@ data/
 
 # Claude scheduler / local
 .claude/
+
+# Segredos locais
+.env
+*.env

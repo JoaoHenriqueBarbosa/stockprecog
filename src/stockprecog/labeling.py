@@ -51,7 +51,7 @@ def _label_ticker(g: pd.DataFrame) -> pd.DataFrame:
                 break
         label[t] = lab
         barrier[t] = why
-        fwd_ret[t] = close[end] / close[t] - 1.0
+        fwd_ret[t] = close[res] / close[t] - 1.0
         t1[t] = dates[res]
 
     g["sigma"] = sigma
