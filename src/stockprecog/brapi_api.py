@@ -157,6 +157,33 @@ def scrape_historical(tickers: list[str], batch: int = 4, rng: str = "max",
     return status
 
 
+def fetch_statistics_history(symbol: str) -> dict | None:
+    """Histórico trimestral de estatísticas-chave (value/quality factors)."""
+    d = _get("/v2/stocks/statistics",
+             {"symbols": symbol, "mode": "history", "period": "quarterly"})
+    res = d.get("results") or []
+    if not res:
+        return None
+    r = res[0]
+    data = r.get("data")
+    return {"symbol": r.get("requestedSymbol", symbol), "data": data} if data else None
+
+
+def scrape_statistics(tickers: list[str], force: bool = False) -> dict[str, str]:
+    """Puxa estatísticas-chave trimestrais por ticker (1 req/ticker), cacheia."""
+    status = {}
+    todo = [t for t in tickers if force or not _cache_path("statistics", t).exists()]
+    for i, t in enumerate(todo, 1):
+        print(f"[stats {i}/{len(todo)}] {t}")
+        r = fetch_statistics_history(t)
+        if r and r.get("data"):
+            _cache_path("statistics", t).write_text(json.dumps(r))
+            status[t] = f"ok({len(r['data'])})"
+        else:
+            status[t] = "vazio"
+    return status
+
+
 def scrape_dividends(tickers: list[str], batch: int = 8, force: bool = False) -> dict[str, str]:
     """Puxa dividendos/JCP por ticker, cacheia."""
     status = {}

@@ -16,7 +16,7 @@ from sklearn.metrics import roc_auc_score
 from . import config as C
 from . import cpcv
 from .brapi_ingest import load_for_pipeline
-from .costs import round_trip_cost_bps
+from .costs import impact_bps
 from .features import FEATURES, make_features
 from .labeling import make_labels
 from .weights import panel_sample_weights
@@ -67,8 +67,12 @@ def _backtest_costed(test: pd.DataFrame, proba: np.ndarray, adv_map: dict,
                      ) -> tuple[np.ndarray, np.ndarray]:
     """Backtest econômico NÃO-SOBREPOSTO: rebalanceia a cada HORIZON dias (holding
     casa com o horizonte do label), long-short equal-weight por proba. frac=fração
-    de cada perna (0.5=split na mediana; 0.1=decis, menos nomes/turnover). Aplica
-    custo lei-sqrt por nome (participation = |Δw|*capital/ADV). Retorna (bruto, líq)."""
+    de cada perna (0.5=split na mediana; 0.1=decis, menos nomes/turnover).
+
+    Custo ONE-WAY por nome (half_spread + impacto lei-sqrt) cobrado sobre |Δw|: a
+    rotação |Δw| já é a perna executada; cobrar round-trip aqui dobraria (entrada e
+    saída aparecem como |Δw| em rebalances distintos). participation=|Δw|*cap/ADV.
+    Retorna (bruto, líquido)."""
     df = test[["date", "ticker", "fwd_ret"]].copy()
     df["proba"] = proba
     days = np.sort(df["date"].unique())[::C.HORIZON]  # stride = HORIZON (não-sobreposto)
@@ -94,7 +98,8 @@ def _backtest_costed(test: pd.DataFrame, proba: np.ndarray, adv_map: dict,
                 continue
             adv = adv_map.get(t, np.nan)
             part = abs(dw) * capital / adv if (np.isfinite(adv) and adv > 0) else 0.01
-            cost += abs(dw) * round_trip_cost_bps(part, sigma, half_spread_bps) / 1e4
+            one_way_bps = half_spread_bps + impact_bps(part, sigma)
+            cost += abs(dw) * one_way_bps / 1e4
         gross.append(gr); net.append(gr - cost)
         prev_w = w
     return np.asarray(gross), np.asarray(net)
